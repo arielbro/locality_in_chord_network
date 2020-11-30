@@ -159,14 +159,14 @@ class Node(object):
         Also note that self initiates all of the messages here, including ones about replacing replacement.
         :return:
         """
-        updates_needed_self = []
-        updates_needed_other = []
-        for (lst, node) in zip([updates_needed_self, updates_needed_other], [self, replacement]):
+        updates_needed_self = set()
+        updates_needed_other = set()
+        for (update_set, node) in zip([updates_needed_self, updates_needed_other], [self, replacement]):
             for i in range(0, config.ring_size_bits):
                 candidate_for_update = self.find_predecessor(shift(node.node_id, 2 ** i, backward=True))
 
                 self.logger.log(self, candidate_for_update)
-                candidate_for_update.get_outdated_fingers(i, node, lst)
+                candidate_for_update.get_outdated_fingers(i, node, update_set)
                 self.logger.log(candidate_for_update, self)
 
         for node, i in updates_needed_self:
@@ -175,13 +175,17 @@ class Node(object):
         for node, i in updates_needed_other:
             node.fingers[i] = self
 
-    def get_outdated_fingers(self, i, outdated_node, update_list, depth=0):
+    def get_outdated_fingers(self, i, outdated_node, update_set, depth=0):
         depth += 1
         if self.fingers[i] == outdated_node:
-            update_list.append((self, i))
+            if (self, i) in update_set:
+                # all nodes of a network can have the same node in their ith entry
+                # in this case, return after one cycle through the network was done
+                return
+            update_set.add((self, i))
             self.logger.log(self, self.predecessor)
             if self.predecessor != self:
-                self.predecessor.get_outdated_fingers(i, outdated_node, update_list, depth)
+                self.predecessor.get_outdated_fingers(i, outdated_node, update_set, depth)
 
     def __repr__(self):
         return "node: " + str(self.node_id)
