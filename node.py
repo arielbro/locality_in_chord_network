@@ -19,12 +19,8 @@ class Node(object):
             self.predecessor = self
             self.fingers = [self for _ in range(config.ring_size_bits)]
         else:
-            self.successor = contact_node.find_successor(node_id)
-            self.logger.log(self, contact_node)
-            self.predecessor = self.successor.predecessor
-            self.logger.log(self, self.successor)
             # self.predecessor = contact_node.find_predecessor(node_id)
-            self.init_fingers()
+            self.init_fingers(contact_node)
             self.update_others()
             self.successor.transfer_keys(self)
             self.logger.log(self, self.successor)
@@ -42,30 +38,36 @@ class Node(object):
             candidate_for_update = self.find_predecessor(shift(self.node_id, 2 ** i, backward=True))
             self.logger.log(self, candidate_for_update)
             candidate_for_update.update_finger_entry(i, self)
+        return
 
     def update_finger_entry(self, i, node):
-        if between(self.node_id, node.node_id, self.fingers[i].node_id, include_left=True):
+        if between(self.node_id, node.node_id, self.fingers[i].node_id, include_left=False):
+            # Paper has include_left=True, it makes newly joined nodes to update their
+            # own successor to themselves upon joining.
             # print("Node {} is better than node {} for the {}th finger of {}".
             #       format(node.node_id, self.fingers[i].node_id, i, self.node_id))
             self.fingers[i] = node
             self.logger.log(self, self.predecessor)
             self.predecessor.update_finger_entry(i, node)
 
-    def init_fingers(self):
-        self.fingers[1:] = [self.find_successor(shift(self.node_id, 2 ** i))
-                            for i in range(1, config.ring_size_bits)]
+    def init_fingers(self, contact):
+        self.successor = contact.find_successor(self.node_id)
+        self.logger.log(self, contact)
+        self.predecessor = self.successor.predecessor
+        self.successor.predecessor = self
+        self.logger.log(self, self.successor)
 
         for i in range(1, config.ring_size_bits):
             if between(self.node_id, shift(self.node_id, 2 ** i), self.fingers[i - 1].node_id, include_left=True):
                 self.fingers[i] = self.fingers[i - 1]
             else:
-                self.fingers[i] = self.find_successor(shift(self.node_id, 2 ** i))
+                self.fingers[i] = contact.find_successor(shift(self.node_id, 2 ** i))
 
     def closest_preceeding_finger(self, node_id):
         for finger in self.fingers[::-1]:
             if finger is None:
                 continue
-            if between(self.node_id, finger.node_id, node_id, include_right=True):
+            if between(self.node_id, finger.node_id, node_id, include_right=False):
                 # paper has right endpint exclusive
                 return finger
         return self
@@ -180,3 +182,6 @@ class Node(object):
             self.logger.log(self, self.predecessor)
             if self.predecessor != self:
                 self.predecessor.get_outdated_fingers(i, outdated_node, update_list, depth)
+
+    def __repr__(self):
+        return "node: " + str(self.node_id)

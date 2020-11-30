@@ -29,8 +29,6 @@ while round < n_rounds:
 
     if op == "join":
 
-        # plot_network(nodes)
-
         if len(nodes) == 0:
             node = Node(node_id=random.randint(0, 2 ** ring_size_bits), logger=logger)
         else:
@@ -38,6 +36,7 @@ while round < n_rounds:
             node = Node(node_id=random.randint(0, 2 ** ring_size_bits), contact_node=contact, logger=logger)
         nodes.append(node)
 
+        # plot_network(nodes)
         # plt.show()
 
     elif op == "lookup":
