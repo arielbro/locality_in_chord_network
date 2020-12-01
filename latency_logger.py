@@ -1,5 +1,6 @@
 from node import Node
 from numpy import random, pi, sin, cos, arccos, arcsin, sqrt
+from util import chord_dist
 
 
 class LatencyLogger:
@@ -10,6 +11,7 @@ class LatencyLogger:
     def __init__(self):
         self.node_to_locations = dict()
         self.latencies = []
+        self.chord_distances = []
 
     def register_node(self, node):
         # sample a random point on a unit sphere
@@ -31,7 +33,13 @@ class LatencyLogger:
         self.latencies = []
         return res
 
+    def flush_chord_dists(self):
+        res = tuple(self.chord_distances)
+        self.chord_distances = []
+        return res
+
     def log(self, node1, node2):
         self.latencies.append(self.dist(node1, node2))
+        self.chord_distances.append(chord_dist(node1, node2))
 
 # TODO: handle virtual nodes

@@ -4,6 +4,7 @@ from rendering import plot_key
 from matplotlib import pyplot as plt
 from itertools import combinations
 from random import choice
+from numpy.random import randint
 
 
 class Node(object):
@@ -42,7 +43,7 @@ class Node(object):
 
     def update_finger_entry(self, i, node):
         if between(self.node_id, node.node_id, self.fingers[i].node_id, include_left=False):
-            # Paper has include_left=True, it makes newly joined nodes to update their
+            # Paper has include_left=True, it makes newly joined nodes update their
             # own successor to themselves upon joining.
             # print("Node {} is better than node {} for the {}th finger of {}".
             #       format(node.node_id, self.fingers[i].node_id, i, self.node_id))
@@ -74,7 +75,7 @@ class Node(object):
 
     def find_predecessor(self, node_id):
         curr_node = self
-        while not between(curr_node.node_id, node_id, curr_node.successor.node_id, include_left=True):
+        while not between(curr_node.node_id, node_id, curr_node.successor.node_id, include_right=True):
             # print("Found predecessor to key {} at node {}".format(node_id, self.node_id))
             next_node = curr_node.closest_preceeding_finger(node_id)
             self.logger.log(curr_node, next_node)
@@ -104,7 +105,31 @@ class Node(object):
         holder.get_data(key)
         self.logger.log(self, holder)
 
-    def localize(self):
+    def localize_switch_random_finger_based(self):
+        candidate = self.find_successor(randint(0, 2 ** config.ring_size_bits))
+        self.logger.log(self, candidate)
+        cur_sum_latencies = sum(self.logger.dist(self, f) for f in self.fingers) +\
+                            sum(self.logger.dist(candidate, f) for f in candidate.fingers)
+        new_sum_latencies = sum(self.logger.dist(self, f) for f in candidate.fingers) + \
+                            sum(self.logger.dist(candidate, f) for f in self.fingers)
+
+        if new_sum_latencies < cur_sum_latencies:
+            candidate.switch_with(self)
+
+    def localize_switch_random_neighbor_based(self):
+        candidate = self.find_successor(randint(0, 2 ** config.ring_size_bits))
+        self.logger.log(self, candidate)
+        self_neighborhood = self.predecessor, self.successor
+        candidate_neighborhood = candidate.predecessor, candidate.successor
+        cur_sum_latencies = sum(self.logger.dist(self, f) for f in self_neighborhood) + \
+                            sum(self.logger.dist(candidate, f) for f in candidate_neighborhood)
+        new_sum_latencies = sum(self.logger.dist(self, f) for f in candidate_neighborhood) + \
+                            sum(self.logger.dist(candidate, f) for f in self_neighborhood)
+
+        if new_sum_latencies < cur_sum_latencies:
+            candidate.switch_with(self)
+
+    def localize_switch_two_fingers(self):
         """
         Uniformly selects nodes n1 and n2 from finger table, such that
         n1 is closer on the circle but has a larger latency, and asks
@@ -171,9 +196,13 @@ class Node(object):
 
         for node, i in updates_needed_self:
             node.fingers[i] = replacement
+            if i == 0:
+                replacement.predecessor = node
 
         for node, i in updates_needed_other:
             node.fingers[i] = self
+            if i == 0:
+                self.predecessor = node
 
     def get_outdated_fingers(self, i, outdated_node, update_set, depth=0):
         depth += 1

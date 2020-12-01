@@ -24,11 +24,11 @@ def plot_network(nodes, logger):
         plt.gca().add_patch(patch)
         plt.annotate("{:.2f}".format(d), (x * 1.2, y * 1.2))
 
-        # x_prime, y_prime = chord_id_to_coordinate(node.predecessor.node_id)
-        # patch = patches.FancyArrowPatch((x_prime, y_prime), (x + 0.01, y + 0.01),
-        #                                 connectionstyle="arc3,rad=-0.4", color='r',
-        #                                 **kw)
-        # plt.gca().add_patch(patch)
+        x_prime, y_prime = chord_id_to_coordinate(node.predecessor.node_id)
+        patch = patches.FancyArrowPatch((x_prime, y_prime), (x + 0.01, y + 0.01),
+                                        connectionstyle="arc3,rad=-0.4", color='r',
+                                        **kw)
+        plt.gca().add_patch(patch)
 
     # plt.show()
     return fig
