@@ -5,6 +5,8 @@ from latency_logger import LatencyLogger
 from config import *
 from rendering import plot_network, plot_key
 from matplotlib import pyplot as plt
+from util import chord_dist
+from itertools import combinations
 
 
 Event = namedtuple("Event", "run_time network_size event_index")
@@ -18,10 +20,8 @@ localize_p = localize_weight / sum_weights
 nodes = []
 logger = LatencyLogger()
 
-print("op_type, op_index, network_size, n_connections, total_time")
-fig = None
-round = 0
-while round < n_rounds:
+op_text = "op_type, network_size, n_connections, total_time\n"
+while len(nodes) < final_network_size:
     op = random.choice(["join", "lookup", "leave", "localize"], p=[join_p, lookup_p, leave_p, localize_p])
 
     if (len(nodes) == 0) and op in ("lookup", "leave", "localize"):
@@ -36,7 +36,7 @@ while round < n_rounds:
             node = Node(node_id=random.randint(0, 2 ** ring_size_bits), contact_node=contact, logger=logger)
         nodes.append(node)
 
-        # plot_network(nodes)
+        # plot_network(nodes, logger)
         # plt.show()
 
     elif op == "lookup":
@@ -46,18 +46,44 @@ while round < n_rounds:
     elif op == "leave":
         continue
     elif op == "localize":
+
+        # plot_network(nodes, logger)
+        # plt.show()
+
         requester = random.choice(nodes)
-        requester.localize()
+        if localization_mode == localization_modes.switch_two_fingers:
+            requester.localize_switch_two_fingers()
+        elif localization_mode == localization_modes.switch_random_finger_based:
+            requester.localize_switch_random_finger_based()
+        elif localization_mode == localization_modes.switch_random_neighbor_based:
+            requester.localize_switch_random_neighbor_based()
+
+        # plot_network(nodes, logger)
+        # plt.show()
+        # pass
     else:
         raise ValueError("What kind of op is this even?")
 
     operation_latencies = logger.flush_latencies()
-    print("{}, {}, {}, {}, {}".format(op, round, len(nodes), len(operation_latencies), sum(operation_latencies)))
+    op_text += "{}, {}, {}, {}\n".format(op, len(nodes), len(operation_latencies), sum(operation_latencies))
 
-    # TODO: print distance correlation statistics
+distances_comparison_text = "chord_dist, latency_dist\n"
+for n1, n2 in combinations(nodes, 2):
+    pair_chord_dist = chord_dist(n1, n2)
+    latency_dist = logger.dist(n1, n2)
+    distances_comparison_text += "{}, {}\n".format(pair_chord_dist, latency_dist)
 
-    round += 1
+chord_distance_distribution_text = "chord_dist\n"
+for d in logger.flush_chord_dists():
+    chord_distance_distribution_text += "{}\n".format(d)
 
-    # if not (round + 1) % 1000:
-    #     print("{} rounds done".format(round + 1))
+file_suffix = "probs=({}, {}, {}),bits={}," \
+              "final_size={},localization={}".format(
+    join_p, lookup_p, localize_p, ring_size_bits, final_network_size, localization_mode.name)
 
+with open("simulation_logs/operation_log_{}.txt".format(file_suffix), "w") as text_file:
+    text_file.write(op_text)
+with open("simulation_logs/message_chord_distance_distribution_{}.txt".format(file_suffix), "w") as text_file:
+    text_file.write(chord_distance_distribution_text)
+with open("simulation_logs/distances_comparison_{}.txt".format(file_suffix), "w") as text_file:
+    text_file.write(distances_comparison_text)
